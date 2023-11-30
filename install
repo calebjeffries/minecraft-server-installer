@@ -1,0 +1,42 @@
+#!/bin/bash
+
+unalias -a
+cd $(dirname $0)
+
+# Install dependencies
+installpkg() {
+  if [[ -z $(which $1) ]]; then
+    echo "Installing $1..."
+    if [[ -n $(which apt-get) ]]; then
+      apt-get install $1
+    else
+      echo "ERR: Could not install $1 on your OS, please install it" >&2
+      exit 1
+    fi
+  fi
+}
+installpkg openjdk-17-jre
+installpkg jq
+installpkg curl
+
+# Get the server
+version=$(curl https://api.papermc.io/v2/projects/paper | jq -r '.versions[-1]')
+build=$(curl https://api.papermc.io/v2/projects/paper/versions/$version | jq -r '.builds[-1]')
+echo "Getting Minecraft server version $version build #$build..."
+filename=$(curl https://api.papermc.io/v2/projects/paper/versions/$version/builds/$build | jq -r '.downloads.application.name')
+curl https://api.papermc.io/v2/projects/paper/versions/$version/builds/$build/downloads/$filename -o paper.jar
+
+# Create a minecraft user
+echo "Creating minecraft user..."
+sudo useradd -m --system --shell=/sbin/nologin minecraft
+
+# Install the server
+echo "Installing the server..."
+mkdir -p /home/minecraft/mc_server
+mv paper.jar /home/minecraft/mc_server
+cat run.sh > /home/minecraft/mc_server/run.sh
+chmod +x /home/minecraft/mc_server/run.sh
+
+# Finish up
+echo "All finished!"
+
